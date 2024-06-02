@@ -62,7 +62,7 @@ func InitLogger() *logger {
 		Bold(true).
 		Foreground(lipgloss.Color("13"))
 	L := log.NewWithOptions(os.Stderr, log.Options{
-		Prefix:          "| R.A.T. |",
+		Prefix:          "R.A.T. ",
 		ReportTimestamp: true,
 		TimeFormat:      time.TimeOnly,
 		Level:           InfoLevel,

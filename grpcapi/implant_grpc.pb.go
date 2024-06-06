@@ -19,16 +19,18 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	Implant_FetchCommand_FullMethodName = "/grpcapi.Implant/FetchCommand"
-	Implant_SendOutput_FullMethodName   = "/grpcapi.Implant/SendOutput"
+	Implant_FetchCommand_FullMethodName    = "/grpcapi.Implant/FetchCommand"
+	Implant_SendOutput_FullMethodName      = "/grpcapi.Implant/SendOutput"
+	Implant_RegisterImplant_FullMethodName = "/grpcapi.Implant/RegisterImplant"
 )
 
 // ImplantClient is the client API for Implant service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ImplantClient interface {
-	FetchCommand(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Command, error)
+	FetchCommand(ctx context.Context, in *Identity, opts ...grpc.CallOption) (*Command, error)
 	SendOutput(ctx context.Context, in *Command, opts ...grpc.CallOption) (*Empty, error)
+	RegisterImplant(ctx context.Context, in *Identity, opts ...grpc.CallOption) (*Identity, error)
 }
 
 type implantClient struct {
@@ -39,7 +41,7 @@ func NewImplantClient(cc grpc.ClientConnInterface) ImplantClient {
 	return &implantClient{cc}
 }
 
-func (c *implantClient) FetchCommand(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Command, error) {
+func (c *implantClient) FetchCommand(ctx context.Context, in *Identity, opts ...grpc.CallOption) (*Command, error) {
 	out := new(Command)
 	err := c.cc.Invoke(ctx, Implant_FetchCommand_FullMethodName, in, out, opts...)
 	if err != nil {
@@ -57,12 +59,22 @@ func (c *implantClient) SendOutput(ctx context.Context, in *Command, opts ...grp
 	return out, nil
 }
 
+func (c *implantClient) RegisterImplant(ctx context.Context, in *Identity, opts ...grpc.CallOption) (*Identity, error) {
+	out := new(Identity)
+	err := c.cc.Invoke(ctx, Implant_RegisterImplant_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ImplantServer is the server API for Implant service.
 // All implementations must embed UnimplementedImplantServer
 // for forward compatibility
 type ImplantServer interface {
-	FetchCommand(context.Context, *Empty) (*Command, error)
+	FetchCommand(context.Context, *Identity) (*Command, error)
 	SendOutput(context.Context, *Command) (*Empty, error)
+	RegisterImplant(context.Context, *Identity) (*Identity, error)
 	mustEmbedUnimplementedImplantServer()
 }
 
@@ -70,11 +82,14 @@ type ImplantServer interface {
 type UnimplementedImplantServer struct {
 }
 
-func (UnimplementedImplantServer) FetchCommand(context.Context, *Empty) (*Command, error) {
+func (UnimplementedImplantServer) FetchCommand(context.Context, *Identity) (*Command, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method FetchCommand not implemented")
 }
 func (UnimplementedImplantServer) SendOutput(context.Context, *Command) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SendOutput not implemented")
+}
+func (UnimplementedImplantServer) RegisterImplant(context.Context, *Identity) (*Identity, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RegisterImplant not implemented")
 }
 func (UnimplementedImplantServer) mustEmbedUnimplementedImplantServer() {}
 
@@ -90,7 +105,7 @@ func RegisterImplantServer(s grpc.ServiceRegistrar, srv ImplantServer) {
 }
 
 func _Implant_FetchCommand_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(Empty)
+	in := new(Identity)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -102,7 +117,7 @@ func _Implant_FetchCommand_Handler(srv interface{}, ctx context.Context, dec fun
 		FullMethod: Implant_FetchCommand_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ImplantServer).FetchCommand(ctx, req.(*Empty))
+		return srv.(ImplantServer).FetchCommand(ctx, req.(*Identity))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -125,6 +140,24 @@ func _Implant_SendOutput_Handler(srv interface{}, ctx context.Context, dec func(
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Implant_RegisterImplant_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Identity)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ImplantServer).RegisterImplant(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Implant_RegisterImplant_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ImplantServer).RegisterImplant(ctx, req.(*Identity))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Implant_ServiceDesc is the grpc.ServiceDesc for Implant service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -139,6 +172,10 @@ var Implant_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SendOutput",
 			Handler:    _Implant_SendOutput_Handler,
+		},
+		{
+			MethodName: "RegisterImplant",
+			Handler:    _Implant_RegisterImplant_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

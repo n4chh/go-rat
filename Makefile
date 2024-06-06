@@ -17,10 +17,10 @@ client: build_client
 	$(BUILD)/client whoami
 
 implant: build_implant
-	$(BUILD)/implant whoami
+	$(BUILD)/implant
 
 server: build_server
-	$(BUILD)/server whoami
+	$(BUILD)/server
 
 protoc:
 	protoc --go_out=. --go_opt=module=$(PACKAGE_NAME) --go-grpc_out=module=$(PACKAGE_NAME):.  grpcapi/implant.proto

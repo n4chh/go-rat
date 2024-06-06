@@ -27,6 +27,7 @@ func main() {
 	ctx := context.Background()
 	var cmd = new(grpcapi.Command)
 	cmd.In = os.Args[1]
+	cmd.Id = os.Args[2]
 	cmd, err = admin_client.RunCommand(ctx, cmd)
 	log.Debug("[*] Resultado recibido.")
 	if err != nil {

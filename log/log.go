@@ -21,12 +21,12 @@ type logger struct {
 	*log.Logger
 }
 
-func (l *logger) Pwned(msg string, args ...any) {
-	l.Log(PwnedLevel, msg, args...)
+func (l *logger) Pwned(msg interface{}, keyvals ...interface{}) {
+	l.Log(PwnedLevel, msg, keyvals...)
 }
 
-func (l *logger) Success(msg string, args ...any) {
-	l.Log(SuccessLevel, msg, args...)
+func (l *logger) Success(msg interface{}, keyvals ...interface{}) {
+	l.Log(SuccessLevel, msg, keyvals...)
 }
 
 var Log *logger
@@ -70,5 +70,17 @@ func InitLogger() *logger {
 	Log = new(logger)
 	Log.Logger = L
 	Log.SetStyles(styles)
+	//test()
 	return Log
+}
+
+func test() {
+	Log.SetLevel(DebugLevel)
+	Log.Debug("Debug")
+	Log.Info("Info")
+	Log.Success("Success")
+	Log.Pwned("Pwned")
+	Log.Warn("Warn")
+	Log.Error("Error")
+	Log.Fatal("Fatal")
 }

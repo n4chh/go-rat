@@ -100,6 +100,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			//return m, m.exec
 		case "ctrl+c":
 			return m, tea.Quit
+		case "esc":
+			m.viewport.SetContent("")
 		}
 		//default:
 		//	return m, nil

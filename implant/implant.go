@@ -44,7 +44,7 @@ func main() {
 		} else {
 			log.Debug("[+] Comando recibido del servidor.", "CMD", cmd.In)
 		}
-		tokens := strings.Split(cmd.In, " ")
+		tokens := strings.Split(strings.Trim(cmd.In, " \n\t"), " ")
 
 		log.Info("Tokens", "Token", tokens)
 		for token := range tokens {

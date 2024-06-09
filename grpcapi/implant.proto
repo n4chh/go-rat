@@ -10,6 +10,8 @@ service Implant {
 
 service Admin {
   rpc RunCommand (Command) returns (Command);
+//  rpc GetImplants (Empty) returns (Implants);
+//  rpc DeleteImplant (Identity) returns (Empty);
 }
 
 message Identity {
@@ -21,6 +23,10 @@ message Command {
   string In = 1;
   string Out = 2;
   string Id = 3;
+}
+
+message Implants {
+  repeated Identity Implants = 1;
 }
 
 message Empty{

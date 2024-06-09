@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/charmbracelet/bubbles/textinput"
+	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/log"
@@ -11,11 +12,17 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"os"
+	"time"
 )
 
 var prompt = lipgloss.NewStyle().
 	SetString("|> ").
 	Foreground(lipgloss.Color("#9fef00"))
+
+var viewportStyle = lipgloss.NewStyle().
+	//Foreground(lipgloss.Color("#ffffa0")).
+	Padding(0, 1).
+	Border(lipgloss.RoundedBorder())
 
 var bye = lipgloss.NewStyle().
 	SetString("Bye").
@@ -28,18 +35,22 @@ var outputStyle = lipgloss.NewStyle().
 	TabWidth(0)
 
 type model struct {
-	input  textinput.Model
-	client grpcapi.AdminClient
-	ctx    context.Context
-	cmd    *grpcapi.Command
-	id     *grpcapi.Identity
+	input    textinput.Model
+	viewport viewport.Model
+	client   grpcapi.AdminClient
+	ctx      context.Context
+	cmd      *grpcapi.Command
+	id       *grpcapi.Identity
 }
 
 func initModel() *model {
 	var m *model = &model{}
 	m.input = textinput.New()
+	m.input.Prompt = ""
 	m.input.PromptStyle = prompt
 	m.input.Focus()
+	m.viewport = viewport.New(80, 20)
+	m.viewport.Style = viewportStyle
 	m.cmd = new(grpcapi.Command)
 	m.cmd.Id = os.Args[1]
 	m.ctx = context.Background()
@@ -53,10 +64,19 @@ func (m model) exec() tea.Msg {
 		if err != nil {
 			return err.Error()
 		}
-		fmt.Println(m.cmd.Out)
-		return "ok"
+		return m.cmd.Out
 	}
 	return _exec()
+}
+
+func (m model) _run() string {
+	var err error
+
+	m.cmd, err = m.client.RunCommand(m.ctx, m.cmd)
+	if err != nil {
+		return err.Error()
+	}
+	return m.cmd.Out
 }
 
 func (m model) Init() tea.Cmd {
@@ -64,27 +84,42 @@ func (m model) Init() tea.Cmd {
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	var cmd tea.Cmd
+	var iCmd, vpCmd tea.Cmd
 
+	m.input, iCmd = m.input.Update(msg)
+	m.viewport, vpCmd = m.viewport.Update(msg)
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "enter":
 			m.cmd.In = m.input.Value()
-			m.cmd.Out = ""
 			m.input.Reset()
-			return m, m.exec
+			m.exec()
+			m.viewport.SetContent(m._run())
+			m.viewport.GotoBottom()
+			//return m, m.exec
 		case "ctrl+c":
-			fmt.Println(bye.Render())
 			return m, tea.Quit
 		}
+		//default:
+		//	return m, nil
 	}
-	m.input, cmd = m.input.Update(msg)
-	return m, cmd
+	return m, tea.Batch(iCmd, vpCmd)
 }
 
 func (m model) View() string {
-	return m.input.View()
+	//if m.cmd.Out == "" {
+	//	return m.input.View()
+	//} else {
+	//	out := outputStyle.Render(m.cmd.Out)
+	//	m.cmd.Out = ""
+	//	return out
+	//}
+	return fmt.Sprintf(
+		"%s\n%s\n%s",
+		"R.A.T. Console",
+		m.viewport.View(),
+		m.input.View())
 }
 
 func main() {
@@ -103,10 +138,12 @@ func main() {
 	defer conn.Close()
 	m = initModel()
 	m.client = grpcapi.NewAdminClient(conn)
-	p := tea.NewProgram(m)
+	p := tea.NewProgram(m, tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		log.Fatal(err)
 	}
+	fmt.Println(bye.Render())
+	time.Sleep(1000)
 	//client = grpcapi.NewAdminClient(conn)
 	//mainLoop(client)
 }

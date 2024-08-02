@@ -32,13 +32,16 @@ func mainLoop(client grpcapi.AdminClient) {
 		fmt.Print(prompt.Render())
 		s.Scan()
 		cmd.In = strings.Trim(s.Text(), " \n")
+		if cmd.In == "exit" {
+			fmt.Println(prompt.SetString("[+]").Render(), "Bye")
+			os.Exit(0)
+		}
 		cmd, err = client.RunCommand(ctx, cmd)
 		if err != nil {
 			log.Fatal(err)
 		}
 		fmt.Println(cmd.Out)
 	}
-
 }
 
 func main() {

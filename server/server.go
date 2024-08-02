@@ -30,15 +30,11 @@ var implants map[uuid.UUID]*session = make(map[uuid.UUID]*session)
 
 func newImplantServer() *implantServer {
 	s := new(implantServer)
-	//s.work = work
-	//s.output = output
 	return s
 }
 
 func newAdminServer(work, output chan *grpcapi.Command) *adminServer {
 	s := new(adminServer)
-	//s.work = work
-	//s.output = output
 	return s
 }
 

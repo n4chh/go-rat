@@ -14,9 +14,9 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-var prompt = lipgloss.NewStyle().
+var PROMPT = lipgloss.NewStyle().
 	SetString("> ").
-	Foreground(lipgloss.Color("#9fef00"))
+	Foreground(lipgloss.Color("#9fe0f0"))
 
 func mainLoop(client grpcapi.AdminClient) {
 	var (
@@ -32,11 +32,11 @@ func mainLoop(client grpcapi.AdminClient) {
 	s := bufio.NewScanner(os.Stdin)
 	for {
 		cmd.Out = ""
-		fmt.Print(prompt.Render())
+		fmt.Print(PROMPT.Render())
 		s.Scan()
 		cmd.In = strings.Trim(s.Text(), " \n")
 		if cmd.In == "exit" {
-			fmt.Println(prompt.SetString("[+]").Render(), "Bye")
+			fmt.Println(PROMPT.SetString("[+]").Render(), "Bye")
 			return
 		}
 		cmd, err = client.RunCommand(ctx, cmd)
@@ -65,5 +65,6 @@ func main() {
 	}
 	defer conn.Close()
 	client = grpcapi.NewAdminClient(conn)
+	implantsMenu(client)
 	mainLoop(client)
 }

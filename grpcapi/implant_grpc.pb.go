@@ -183,7 +183,8 @@ var Implant_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
-	Admin_RunCommand_FullMethodName = "/grpcapi.Admin/RunCommand"
+	Admin_RunCommand_FullMethodName  = "/grpcapi.Admin/RunCommand"
+	Admin_GetImplants_FullMethodName = "/grpcapi.Admin/GetImplants"
 )
 
 // AdminClient is the client API for Admin service.
@@ -191,6 +192,7 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type AdminClient interface {
 	RunCommand(ctx context.Context, in *Command, opts ...grpc.CallOption) (*Command, error)
+	GetImplants(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Implants, error)
 }
 
 type adminClient struct {
@@ -210,11 +212,21 @@ func (c *adminClient) RunCommand(ctx context.Context, in *Command, opts ...grpc.
 	return out, nil
 }
 
+func (c *adminClient) GetImplants(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Implants, error) {
+	out := new(Implants)
+	err := c.cc.Invoke(ctx, Admin_GetImplants_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AdminServer is the server API for Admin service.
 // All implementations must embed UnimplementedAdminServer
 // for forward compatibility
 type AdminServer interface {
 	RunCommand(context.Context, *Command) (*Command, error)
+	GetImplants(context.Context, *Empty) (*Implants, error)
 	mustEmbedUnimplementedAdminServer()
 }
 
@@ -224,6 +236,9 @@ type UnimplementedAdminServer struct {
 
 func (UnimplementedAdminServer) RunCommand(context.Context, *Command) (*Command, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RunCommand not implemented")
+}
+func (UnimplementedAdminServer) GetImplants(context.Context, *Empty) (*Implants, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetImplants not implemented")
 }
 func (UnimplementedAdminServer) mustEmbedUnimplementedAdminServer() {}
 
@@ -256,6 +271,24 @@ func _Admin_RunCommand_Handler(srv interface{}, ctx context.Context, dec func(in
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Admin_GetImplants_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AdminServer).GetImplants(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Admin_GetImplants_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AdminServer).GetImplants(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Admin_ServiceDesc is the grpc.ServiceDesc for Admin service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -266,6 +299,10 @@ var Admin_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RunCommand",
 			Handler:    _Admin_RunCommand_Handler,
+		},
+		{
+			MethodName: "GetImplants",
+			Handler:    _Admin_GetImplants_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

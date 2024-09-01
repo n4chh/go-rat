@@ -2,13 +2,13 @@ BUILD = dist
 PACKAGE_NAME = github.com/iortego42/go-rat
 
 build_client: $(BUILD)
-	go build -o $(BUILD)/client client/client.go
+	go build -o $(BUILD)/client ./client
 
 build_implant: $(BUILD)
-	go build -o $(BUILD)/implant implant/implant.go
+	go build -o $(BUILD)/implant ./implant
 
 build_server: $(BUILD)
-	go build -o $(BUILD)/server server/server.go
+	go build -o $(BUILD)/server ./server
 
 $(BUILD):
 	mkdir $(BUILD)

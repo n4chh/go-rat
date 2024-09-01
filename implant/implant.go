@@ -54,7 +54,7 @@ func main() {
 			return
 		}
 		if err != nil && err.Error() == a.Err().Error() {
-			log.Info("hey")
+			log.Debug("hey")
 			return
 		}
 		// TODO: Comparar el tipo de error, si al recibir

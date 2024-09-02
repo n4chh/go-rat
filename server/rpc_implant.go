@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
 	_ "net/http/pprof"
 
 	"github.com/google/uuid"
@@ -62,11 +61,10 @@ func (s *implantServer) FetchCommand(ctx context.Context, identity *grpcapi.Iden
 		logger.Debug("Comando recibido.", "CMD", cmd.In, "Implant", identity.Name)
 		cmd.Id = identity.Id
 		return cmd, nil
+	} else {
+		err = errors.New("channel closed")
+		return cmd, err
 	}
-	implants[id] = nil
-	err = errors.New("channel closed")
-	fmt.Println(err)
-	return cmd, err
 	// }
 }
 

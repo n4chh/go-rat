@@ -31,8 +31,9 @@ func (s *adminServer) RunCommand(ctx context.Context, command *grpcapi.Command) 
 	if command.In == "quit" {
 		close(implants[id].in)
 		close(implants[id].out)
-		logger.Debug("Implant Cerrado")
-		return nil, nil
+		delete(implants, id)
+		logger.Debug("Implant Cerrado", "implants", implants)
+		return nil, errors.New("implant closed")
 	}
 	go func() {
 		implants[id].in <- command

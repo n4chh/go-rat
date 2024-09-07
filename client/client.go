@@ -1,24 +1,16 @@
 package main
 
 import (
-	"bufio"
 	"context"
-	"fmt"
-	"os"
-	"strings"
 
-	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/bubbles/key"
+	"github.com/charmbracelet/bubbles/textinput"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/log"
-	"github.com/google/uuid"
 	"github.com/iortego42/go-rat/grpcapi"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/grpc/status"
 )
-
-var PROMPT = lipgloss.NewStyle().
-	SetString("|> ").
-	Foreground(lipgloss.Color("#9fe0f0"))
 
 // TODO: Revisar si merece la pena
 // func handleStatusCodes(s *status.Status) int{
@@ -30,62 +22,139 @@ var PROMPT = lipgloss.NewStyle().
 // 	}
 // }
 
-func mainLoop(client grpcapi.AdminClient, implant uuid.UUID) {
-	var (
-		ctx context.Context
-		cmd *grpcapi.Command
-		err error
-	)
-	ctx = context.Background()
-	cmd = new(grpcapi.Command)
-	PROMPT.SetString("[", implant.String(), "]\n|>")
+// global types
 
-	cmd.Id = implant.String()
-	s := bufio.NewScanner(os.Stdin)
-	for {
-		cmd.Out = ""
-		fmt.Print(PROMPT.SetString("ID: ").Bold(true).Render())
-		fmt.Println(PROMPT.SetString("").UnsetForeground().Render(implant.String()))
-		fmt.Print(PROMPT.Render())
-		s.Scan()
-		strCmd := strings.Trim(s.Text(), " \n")
-		if strCmd == "" {
-			continue
-		}
-		if strCmd == "exit" {
-			fmt.Println(PROMPT.SetString("[+]").Render(), "Bye")
-			return
-		}
-		cmd.In = strCmd
-		cmd, err = client.RunCommand(ctx, cmd)
-		if cmd == nil && err == nil {
-			log.Info("Implant cerrado", "id", implant.String())
-			return
-		}
-		if err != nil {
-			statusErr, ok := status.FromError(err)
-			if !ok {
-				log.Fatal("Error creando statusErr")
-			}
-			if statusErr.Message() == "implant closed" {
-				logger.Info("Implant Cerrado", "id", implant.String())
-				return
-			}
-			log.Fatal(err)
-		}
-		fmt.Print(cmd.Out)
-		if cmd.Out != "" && cmd.Out[len(cmd.Out)-1] != '\n' && cmd.In != "clear" {
-			fmt.Println(PROMPT.Bold(true).Background(lipgloss.Color("#9fe0f0")).Foreground(lipgloss.Color("#1a1a1a")).SetString("%").Render())
-		}
+type (
+	GoBackMsg bool
+	// Modes
+	mode int8
+)
+
+const (
+	PromptImplant mode = iota
+	SelectImplant
+)
+
+func (m mode) String() string {
+	switch m {
+	case PromptImplant:
+		return "Implant Prompt"
+	case SelectImplant:
+		return "Select Implant"
 	}
+	return "unknown"
+}
+
+// app
+
+type AppKeyMap struct {
+	CtrlC key.Binding
+}
+
+type ClientApp struct {
+	Menu   *MenuModel
+	Prompt textinput.Model
+	State  mode
+	KeyMap AppKeyMap
+	Client grpcapi.AdminClient
+}
+
+func (a *ClientApp) Init() tea.Cmd {
+	a.FetchImplants()
+	return nil
+}
+
+func (a *ClientApp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmds []tea.Cmd
+
+	switch _msg := msg.(type) {
+	case tea.KeyMsg:
+		switch {
+		case key.Matches(_msg, a.KeyMap.CtrlC):
+			return a, tea.Quit
+		}
+	case SelectMsg:
+		a.State = PromptImplant
+
+	case GoBackMsg:
+		if a.State == SelectImplant {
+			return a, tea.Quit
+		}
+		a.State = SelectImplant
+	}
+	switch a.State {
+	case SelectImplant:
+		m, cmd := a.Menu.Update(msg)
+		newMenu, ok := m.(*MenuModel)
+		if !ok {
+			log.Fatal("Bad assertion", "menu", m)
+		}
+		a.Menu = newMenu
+		cmds = append(cmds, cmd)
+		return a, tea.Batch(cmds...)
+		// case PromptImplant:
+		// 	m, cmd := a.Menu.Update(msg)
+		// 	newMenu, ok := m.(MenuModel)
+		// 	if !ok {
+		// 		log.Fatal("Bad assertion", "menu", m)
+		// 	}
+		// 	a.Menu = newMenu
+		// 	cmds = append(cmds, cmd)
+		// 	return a, tea.Batch(cmds...)
+	default:
+		a.FetchImplants()
+		logger.Info(a)
+	}
+	return a, nil
+}
+
+func (a *ClientApp) View() string {
+	switch a.State {
+	case SelectImplant:
+		return a.Menu.View()
+	case PromptImplant:
+		return a.Prompt.View()
+	}
+	return ""
+}
+
+func (a *ClientApp) FetchImplants() tea.Msg {
+	var (
+		ctx   = context.Background()
+		items []string
+	)
+	availableImplants, err := a.Client.GetImplants(ctx, nil)
+	if err != nil {
+		logger.Fatal(err)
+	}
+	for _, v := range availableImplants.Implants {
+		logger.Debug(v.Id)
+		items = append(items, v.Id)
+	}
+	a.Menu = initMenu(items, 0)
+	a.State = SelectImplant
+	return nil
+}
+
+func NewClientApp(conn *grpc.ClientConn) *ClientApp {
+	_keymap := AppKeyMap{
+		CtrlC: key.NewBinding(key.WithKeys("ctrl+c"), key.WithHelp("Ctrl C", "Force Quit")),
+	}
+	a := &ClientApp{
+		Prompt: textinput.Model{},
+		Client: grpcapi.NewAdminClient(conn),
+		KeyMap: _keymap,
+		// State:  SelectImplant,
+	}
+	return a
 }
 
 func main() {
 	var (
-		opts   []grpc.DialOption
-		err    error
-		conn   *grpc.ClientConn
-		client grpcapi.AdminClient
+		opts []grpc.DialOption
+		conn *grpc.ClientConn
+		err  error
+		app  *ClientApp
 	)
 	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	conn, err = grpc.NewClient("127.0.0.1:9090", opts...)
@@ -93,11 +162,9 @@ func main() {
 		log.Fatal("[!] No se pudo establecer conexión con el servidor principal.", "ERROR", err)
 	}
 	defer conn.Close()
-	client = grpcapi.NewAdminClient(conn)
-	id := implantsMenu(client)
-	implant, err := uuid.Parse(id)
-	if err != nil {
-		log.Fatal("Not a valid ID", "error", err, "id", id)
+	app = NewClientApp(conn)
+	p := tea.NewProgram(app)
+	if _, err = p.Run(); err != nil {
+		log.Fatal("Ocurrió un error en la ejecución del programa.", "error", err)
 	}
-	mainLoop(client, implant)
 }

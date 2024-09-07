@@ -13,4 +13,6 @@ Arreglar  metodo GetImplants
 En caso de afrontar el busy_waiting con sleep, generar implant con un tiempo especifico de sleep
 Si un implant muere por cualquier causa hay que quitarlo de la lista 
 ## Secundarias Prescindibles
-k
+### Client
+Funcion de recarga para actualizar los implants de tipo tea.Cmd, implementar spinners de 
+carga o algo similar mientras espera la respuesta del servidor

@@ -1,14 +1,11 @@
 package main
 
 import (
-	"context"
 	"fmt"
-	"os"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/lipgloss/list"
-	"github.com/iortego42/go-rat/grpcapi"
 	"github.com/iortego42/go-rat/log"
 )
 
@@ -25,33 +22,51 @@ var SELECTORSTYLE lipgloss.Style = lipgloss.NewStyle().
 
 	// Padding(1)
 
-type menu struct {
+// TYPES
+type SelectMsg struct{ Implant string }
+
+type MenuModel struct {
 	Elements []string
 	Cursor   int
-	Chosen   bool
-	Quiting  bool
+	List     *list.List
 }
 
-func initMenu(elements []string, cursor int) menu {
-	return menu{
+// ----
+func initMenu(elements []string, cursor int) *MenuModel {
+	return &MenuModel{
 		Elements: elements,
 		Cursor:   cursor,
-		Chosen:   false,
-		Quiting:  false,
+		List:     list.New(elements).ItemStyle(ITEMSTYLE).EnumeratorStyle(SELECTORSTYLE),
 	}
 }
 
-func (m menu) Init() tea.Cmd {
+func (m *MenuModel) Init() tea.Cmd {
 	return nil
 }
 
-func (m menu) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *MenuModel) Quit() tea.Msg {
+	var msg GoBackMsg = true
+	return msg
+}
+
+// TODO: Funcion de recarga de tipo tea.Cmd para actualizar los implants,
+// implementar spinners de carga o algo similar mientras
+// espera la respuesta del servidor
+
+func (m *MenuModel) Choose() tea.Msg {
+	var msg SelectMsg
+	msg.Implant = m.Elements[m.Cursor]
+	return msg
+}
+
+func (m *MenuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd = nil
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		switch msg.String() {
-		case "ctrl+c", "q":
-			m.Quiting = true
-			return m, tea.Quit
+		s := msg.String()
+		switch s {
+		case "q", "esq":
+			cmd = m.Quit
 		case "up", "k":
 			if m.Cursor > 0 {
 				m.Cursor--
@@ -61,59 +76,20 @@ func (m menu) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.Cursor++
 			}
 		case "enter":
-			m.Chosen = true
-			return m, tea.Quit
+			cmd = m.Choose
 		}
 	}
-	return m, nil
+	return m, cmd
 }
 
-func (m menu) View() string {
-	if m.Quiting || m.Chosen {
-		return ""
-	}
-	l := list.New(m.Elements)
-	l.ItemStyle(ITEMSTYLE)
-	l.EnumeratorStyle(SELECTORSTYLE)
-	l = l.Enumerator(m.selector)
-	return fmt.Sprintln(l)
+func (m *MenuModel) View() string {
+	m.List = m.List.Enumerator(m.selector)
+	return fmt.Sprintln(m.List)
 }
 
-func (m menu) selector(items list.Items, i int) string {
+func (m *MenuModel) selector(items list.Items, i int) string {
 	if i == m.Cursor {
 		return "|> "
 	}
 	return ""
-}
-
-func implantsMenu(client grpcapi.AdminClient) string {
-	var (
-		m     menu
-		ctx   = context.Background()
-		items []string
-	)
-
-	availableImplants, err := client.GetImplants(ctx, nil)
-	if err != nil {
-		logger.Fatal(err)
-	}
-	for _, v := range availableImplants.Implants {
-		logger.Debug(v.Id)
-		items = append(items, v.Id)
-	}
-	logger.Debug(items)
-	p := tea.NewProgram(initMenu(items, 0))
-	_m, err := p.Run()
-	if err != nil {
-		logger.Fatal("There was an error on menu", "menu", err)
-	}
-	m, ok := _m.(menu)
-	if !ok {
-		logger.Fatal("Error at the end of menu")
-	}
-	if m.Quiting {
-		logger.Info("Quiting.")
-		os.Exit(1)
-	}
-	return m.Elements[m.Cursor]
 }

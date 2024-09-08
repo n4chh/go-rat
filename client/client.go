@@ -57,7 +57,7 @@ func (m Mode) String() string {
 // app
 
 type AppKeyMap struct {
-	CtrlC key.Binding
+	CtrlC, CtrlL key.Binding
 }
 
 type ClientApp struct {
@@ -82,13 +82,16 @@ func (a ClientApp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch {
 		case key.Matches(_msg, a.KeyMap.CtrlC):
 			return a, tea.Quit
+		case key.Matches(_msg, a.KeyMap.CtrlL):
+			cmds = append(cmds, tea.ClearScreen)
+			return a, tea.ClearScreen
 		}
 	case MenuMsg:
 		a.Menu = _msg.Menu
 		a.State = SelectImplant
 	case SelectMsg:
 		a.Prompt = NewPromptModel(_msg.Implant)
-		cmds = append(cmds, PromptReady)
+		cmds = append(cmds, a.Prompt.PromptReady)
 		return a, tea.Batch(cmds...)
 	case PromptReadyMsg:
 		a.State = PromptImplant
@@ -109,6 +112,7 @@ func (a ClientApp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.Err = _msg.Err
 			a.State = Error
 		}
+		a.Cmd.Out = _msg.Output
 	}
 	switch a.State {
 	case SelectImplant:
@@ -130,7 +134,10 @@ func (a ClientApp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, cmd)
 		return a, tea.Batch(cmds...)
 	case CmdOutRecived:
-		cmds = append(cmds, PromptReady)
+		s := a.Cmd.Out
+		a.Cmd.Out = ""
+		cmds = append(cmds, tea.Printf(s))
+		cmds = append(cmds, a.Prompt.PromptReady)
 		return a, tea.Batch(cmds...)
 	case Error:
 		a.State = Default
@@ -147,16 +154,20 @@ func (a ClientApp) View() string {
 	case SelectImplant:
 		return a.Menu.View()
 	case PromptImplant:
+		// s := a.Cmd.Out
+		// if a.Cmd.Out != "" && a.Cmd.Out[len(a.Cmd.Out)-1] != '\n' && a.Cmd.In != "clear" {
+		// s += fmt.Sprintln(PROMPTSTYLE.Bold(true).Background(lipgloss.Color("#9fe0f0")).Foreground(lipgloss.Color("#1a1a1a")).SetString("%").Render())
+		// }
+		// return s + a.Prompt.View()
 		return a.Prompt.View()
-	case CmdOutRecived:
-		return a.Prompt.View() + "\n" + a.Cmd.Out
 	}
 	return ""
 }
 
 func NewClientApp(conn *grpc.ClientConn) ClientApp {
 	_keymap := AppKeyMap{
-		CtrlC: key.NewBinding(key.WithKeys("ctrl+c"), key.WithHelp("Ctrl C", "Force Quit")),
+		CtrlC: key.NewBinding(key.WithKeys("ctrl+c"), key.WithHelp("Ctrl C", "Forzar salida")),
+		CtrlL: key.NewBinding(key.WithKeys("ctrl+l"), key.WithHelp("Ctrl L", "Limpiar la pantalla")),
 	}
 	a := ClientApp{
 		Client: grpcapi.NewAdminClient(conn),

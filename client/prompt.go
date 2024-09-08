@@ -24,7 +24,7 @@ type PromptModel struct {
 	KeyMap  PromptKeyMap
 }
 
-func PromptReady() tea.Msg {
+func (p *PromptModel) PromptReady() tea.Msg {
 	var ret PromptReadyMsg = true
 	return ret
 }
@@ -72,13 +72,14 @@ func (p PromptModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(_msg, p.KeyMap.Quit):
 			cmd = p.Quit
 		case key.Matches(_msg, p.KeyMap.Enter):
+			value := p.Ti.Value()
+			p.Ti.Reset()
 			cmd = func() tea.Msg {
 				return SendCmdMsg{
 					ID:    p.Implant,
-					Input: p.Ti.Value(),
+					Input: value,
 				}
 			}
-			p.Ti.Reset()
 		default:
 			p.Ti, cmd = p.Ti.Update(msg)
 		}

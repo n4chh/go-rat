@@ -28,7 +28,7 @@ func (s *adminServer) RunCommand(ctx context.Context, command *grpcapi.Command) 
 	if implants[id] == nil {
 		return nil, errors.New("cant run command, no such id")
 	}
-	if command.In == "quit" {
+	if command.In == "quit" || command.In == "exit" {
 		close(implants[id].in)
 		close(implants[id].out)
 		delete(implants, id)

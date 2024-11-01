@@ -2,6 +2,7 @@
 ## Prioritarias
 ### Global
 Implementar errores de GRPC.
+Implenetar gestion de errores global.
 ### Implant
 solucionar busy_waiting
 ### Client
@@ -16,3 +17,5 @@ Si un implant muere por cualquier causa hay que quitarlo de la lista
 ### Client
 Funcion de recarga para actualizar los implants de tipo tea.Cmd, implementar spinners de 
 carga o algo similar mientras espera la respuesta del servidor
+Se puede implementar la reverse shell con tea.Exec
+Mensaje cuando no hay implants conectados

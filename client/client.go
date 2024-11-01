@@ -5,6 +5,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/iortego42/go-rat/grpcapi"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -36,6 +37,7 @@ const (
 	// PromptReady
 	CmdOutRecived
 	Error
+	GrpcError
 )
 
 func (m Mode) String() string {
@@ -84,7 +86,20 @@ func (a ClientApp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return a, tea.Quit
 		case key.Matches(_msg, a.KeyMap.CtrlL):
 			cmds = append(cmds, tea.ClearScreen)
-			return a, tea.ClearScreen
+			return a, tea.Batch(cmds...)
+		}
+	// TODO: Se podria implementarr alguna gestion de errores adicional para
+	// implementar algun handler o algo por el estilo, por ahora se notificara en la aplicacion
+
+	case ErrorMsg:
+		if _msg.GrpcStatusErr != nil {
+			a.State = GrpcError
+			a.Err = _msg.GrpcStatusErr.Err()
+			return a, nil
+		} else {
+			a.State = Error
+			a.Err = _msg.Err
+			return a, nil
 		}
 	case MenuMsg:
 		a.Menu = _msg.Menu
@@ -139,16 +154,21 @@ func (a ClientApp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, tea.Printf(s))
 		cmds = append(cmds, a.Prompt.PromptReady)
 		return a, tea.Batch(cmds...)
-	case Error:
-		a.State = Default
-		return a, nil
 	}
 	return a, nil
 }
 
+func (a ClientApp) Errors() string {
+	style := lipgloss.NewStyle().SetString(a.Err.Error()).
+		Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("#FF0000")).
+		Bold(true).
+		Padding(2, 4)
+	return style.Render()
+}
+
 func (a ClientApp) View() string {
 	if a.Err != nil {
-		return a.Err.Error()
+		return a.Errors()
 	}
 	switch a.State {
 	case SelectImplant:

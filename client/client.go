@@ -160,7 +160,7 @@ func (a ClientApp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (a ClientApp) Errors() string {
 	style := lipgloss.NewStyle().SetString(a.Err.Error()).
-		Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("#FF0000")).
+		Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("1")).
 		Bold(true).
 		Padding(2, 4)
 	return style.Render()

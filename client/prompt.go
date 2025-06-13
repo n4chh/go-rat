@@ -9,7 +9,7 @@ import (
 
 var PROMPTSTYLE = lipgloss.NewStyle().
 	SetString("ID:").
-	Foreground(lipgloss.Color("#9fe0f0")).
+	Foreground(lipgloss.Color("5")).
 	Bold(true)
 
 type PromptReadyMsg bool
@@ -46,10 +46,10 @@ func NewPromptModel(implant string) PromptModel {
 	p.Ti.Prompt = ""
 	p.Ti.PromptStyle = lipgloss.NewStyle().
 		SetString("|>").
-		Foreground(lipgloss.Color("#9fe0f0"))
+		Foreground(lipgloss.Color("5"))
 	p.Ti.Placeholder = "Introduzca un comando."
 	p.Ti.PlaceholderStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#afafaf"))
+		Foreground(lipgloss.Color("default"))
 	p.KeyMap = _keymap
 	return p
 }
